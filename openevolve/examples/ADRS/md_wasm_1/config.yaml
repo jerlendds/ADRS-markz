@@ -1,0 +1,61 @@
+# OpenEvolve config for evolving a Rust→WASM CommonMark parser (zero-deps)
+
+max_iterations: 200
+checkpoint_interval: 5
+log_level: "INFO"
+
+llm:
+  # Use whatever models you already have wired; these are placeholders.
+  primary_model: "o3"
+  primary_model_weight: 1.0
+  secondary_model: "gpt-4.1-mini"
+  secondary_model_weight: 0.15
+  temperature: 0.6
+  top_p: 0.95
+  max_tokens: 32768
+  timeout: 600
+  api_base: "https://api.openai.com/v1"
+  api_key: ${OPENAI_API_KEY}
+
+prompt:
+  system_message: |
+    You are evolving a **zero-dependency Rust** Markdown→HTML renderer that must compile to **wasm32-wasi** and aim toward **CommonMark compliance** and **speed**.
+    Constraints:
+      - No external crates; only Rust std.
+      - Forbid unsafe code.
+      - Produce small, predictable HTML; escape HTML entities correctly.
+      - Must compile and run as both native and WASM.
+    Evaluation pressure:
+      - Correctness on a subset of CommonMark-like cases (headings, paragraphs, strong/emphasis, inline code, fenced blocks, lists, links).
+      - Speed: render a sample quickly.
+      - Binary size: wasm ≤ 2MB, smaller is better.
+
+    Edit ONLY the `RUST_LIB_RS` string (the EVOLVE-BLOCK) in initial_program.py.
+    Keep the public API stable:
+      - `pub fn render_html(input: &str) -> String` must exist and be pure.
+    Prefer single-pass or near linear-time parsing. Avoid regex backtracking.
+    Keep allocations tight; reuse buffers; pre-size outputs when possible.
+    Ensure heading detection follows "hashes then space". Escape `<`, `>`, `&`, and quotes in attributes.
+
+  num_top_programs: 3
+  num_diverse_programs: 2
+  use_template_stochasticity: true
+
+database:
+  db_path: "./openevolve_output/md_wasm_1"
+  population_size: 60
+  archive_size: 20
+  num_islands: 4
+  elite_selection_ratio: 0.25
+  exploitation_ratio: 0.7
+  exploration_ratio: 0.3
+
+evaluator:
+  timeout: 480
+  parallel_evaluations: 1
+  use_llm_feedback: false
+
+# Evolution settings
+diff_based_evolution: true
+allow_full_rewrites: false
+max_code_length: 60000

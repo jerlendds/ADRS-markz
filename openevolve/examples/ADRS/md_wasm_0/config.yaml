@@ -1,0 +1,69 @@
+# OpenEvolve: Evolve a blazing-fast CommonMark→HTML renderer in Rust → WASM.
+
+max_iterations: 200
+checkpoint_interval: 10
+log_level: "INFO"
+
+llm:
+  # Keep this minimal; adjust to your infra. (Matches style in existing examples.)
+  models:
+    - name: "gemini-2.5-pro"
+      weight: 0.5
+      api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      api_key: ${GEMINI_API_KEY}
+    - name: "o3"
+      weight: 0.5
+      api_base: "https://api.openai.com/v1"
+      api_key: ${OPENAI_API_KEY}
+  temperature: 0.6
+  top_p: 0.95
+  max_tokens: 32000
+  timeout: 600
+
+prompt:
+  system_message: |
+    You are evolving a Rust program compiled to WebAssembly that renders Markdown to HTML.
+    Constraints:
+    - Must be CommonMark compliant (no extensions) by default behavior.
+    - Must compile for both native and wasm32-wasi.
+    - The binary must read Markdown from STDIN and write HTML to STDOUT.
+    - The code to edit is the `rust_main_code` string inside the EVOLVE-BLOCK.
+    - Keep the Cargo layout and binary contract intact.
+
+    Primary objective (70%): Maximize correctness on CommonMark.
+    Secondary (25%): Maximize performance (lower latency, higher throughput).
+    Tertiary (5%): Minimize WASM size without harming correctness.
+
+    Allowed strategies:
+    - Optimize allocation patterns (arenas, buffers), avoid copies, reuse buffers.
+    - Tune parser/render options that preserve CommonMark correctness.
+    - SIMD where beneficial (safe APIs), short-circuit fast paths, small-string optimizations.
+    - Reduce code size (LTO, panic=abort, codegen-units=1) while keeping speed.
+    - Safe Rust only; no UB; deterministic output.
+
+    Disallowed:
+    - Changing IO contract.
+    - Depending on non-CommonMark extensions for baseline correctness.
+    - Printing to stdout anything except the HTML result.
+
+    Return only the updated `rust_main_code` content within the EVOLVE-BLOCK in the Python file.
+  num_top_programs: 3
+  use_template_stochasticity: true
+
+database:
+  population_size: 60
+  archive_size: 20
+  num_islands: 3
+  elite_selection_ratio: 0.25
+  exploitation_ratio: 0.65
+  exploration_ratio: 0.35
+  db_path: "./openevolve_output/md_wasm_0"
+
+evaluator:
+  timeout: 600
+  parallel_evaluations: 2
+  use_llm_feedback: false
+
+diff_based_evolution: true
+allow_full_rewrites: false
+max_code_length: 30000

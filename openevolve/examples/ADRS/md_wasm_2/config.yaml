@@ -1,0 +1,70 @@
+# OpenEvolve configuration: evolve a zero-dep Rust Markdown -> HTML renderer
+max_iterations: 200
+checkpoint_interval: 10
+log_level: "INFO"
+
+llm:
+  # Use whatever models your OpenEvolve install is wired for.
+  primary_model: "o3"
+  primary_model_weight: 1.0
+  temperature: 0.6
+  top_p: 0.95
+  max_tokens: 24000
+  timeout: 600
+  api_base: "https://api.openai.com/v1"
+  api_key: ${OPENAI_API_KEY}
+
+prompt:
+  system_message: |
+    You are evolving a **zero-dependency** Rust Markdown→HTML renderer that must:
+    1) Be as close to the CommonMark spec as possible,
+    2) Compile for `wasm32-unknown-unknown` (no OS, no threads, no alloc beyond std),
+    3) Run extremely fast as a native CLI for evaluation.
+
+    Only modify code inside the `EVOLVE-BLOCK-START` / `EVOLVE-BLOCK-END` in `initial_program.py` (the Rust source string).
+    Do NOT change the I/O contract or the harness.
+
+    Requirements & constraints:
+    - No external crates — standard library only.
+    - Deterministic; no global mutable state that affects output.
+    - Keep `render_markdown(src: &str) -> String` signature.
+    - Must not perform network or filesystem I/O beyond stdin/stdout provided by main.
+    - HTML output must be stable and minimal (no extra whitespace beyond what tests expect).
+    - Optimize both correctness and throughput; keep allocations tight and avoid quadratic scans.
+
+    Prioritize correctness for the following CommonMark areas:
+    - ATX headings (`#` to `######`)
+    - Paragraphs & blank-line separation
+    - Emphasis / strong (`*`, `**`) with reasonable nesting behavior
+    - Code spans and fenced code blocks (```), preserving literal text
+    - Blockquotes (`>`) and simple unordered lists (`- ` items)
+    - Links `[text](url)` (no nested brackets)
+    - HTML escaping (&, <, >, ", ')
+    - Windows newlines normalization
+
+    Performance guidance:
+    - One or few passes; avoid regex; branch predictably.
+    - Pre-allocate output buffers based on input size.
+    - Inline small helpers; reduce temporary Strings.
+    - Consider scanning by bytes but be careful with UTF-8.
+
+  num_top_programs: 3
+  num_diverse_programs: 2
+
+database:
+  db_path: "./openevolve_output/md_wasm_3"
+  population_size: 60
+  archive_size: 24
+  num_islands: 4
+  elite_selection_ratio: 0.3
+  exploitation_ratio: 0.65
+  exploration_ratio: 0.35
+
+evaluator:
+  timeout: 900
+  parallel_evaluations: 1
+  use_llm_feedback: false
+
+diff_based_evolution: true
+allow_full_rewrites: false
+max_code_length: 35000
